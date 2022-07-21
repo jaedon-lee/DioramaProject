@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<!DOCTYPE html>
+<html>
+	<head>
+    <title>loading glTF mesh + textures</title>
+	</head>
+	<body>
+    
+   <script type="module">
+
+    /*
+    Our scene is a building with a sun and moon. 
+    The sun and moon are two objects with textures applied to them that are moving and spinning. 
+    There is one light that follows the sun, and four lights that don't move. The lights change
+    color and brightness with the position of the sun. 
+
+    source for building:
+    <https://sketchfab.com/3d-models/the-neko-stop-off-hand-painted-diorama-a5ea0bf252884fceabf1007e8050f3fc#download> 
+    */
+
+      import * as THREE from './js/build/three.module.js'
+      import { OrbitControls } from './js/examples/jsm/controls/OrbitControls.js'
+      
+      import { GLTFLoader } from './js/examples/jsm/loaders/GLTFLoader.js';
+			import { RGBELoader } from './js/examples/jsm/loaders/RGBELoader.js';
+      import { RoughnessMipmapper } from './js/examples/jsm/loaders/RoughnessMipmapper.js';
+
+			let camera, scene, renderer, controls;
+
+			init();
+			render();
+
+			function init() {
+
+				const container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.25, 20 );
+			
+
+        scene = new THREE.Scene();
+
+        renderer = new THREE.WebGLRenderer( { antialias: true } );
+        renderer.setPixelRatio( window.devicePixelRatio );
+        renderer.setSize( window.innerWidth, window.innerHeight );
+      
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        container.appendChild( renderer.domElement );
+
+        const pmremGenerator = new THREE.PMREMGenerator( renderer ); //PMREM  = Prefiltered, Mipmapped Radiance Environment Map
+        pmremGenerator.compileEquirectangularShader();
+
+        controls = new OrbitControls( camera, renderer.domElement );
+        controls.addEventListener( 'change', render ); // use if there is no animation loop
+
+        const loader = new THREE.TextureLoader();
+
+        // sun 
+        const geometry1 = new THREE.SphereGeometry(0.75, 32, 32); 
+        const material1 = new THREE.MeshBasicMaterial({ map: loader.load('./images/sunmap.jpg') });
+        const sphere1 = new THREE.Mesh(geometry1, material1);
+        sphere1.position.set( 10, 20, -10 );  
+        scene.add(sphere1);
+
+        // moon
+        const geometry2 = new THREE.SphereGeometry(0.75, 32, 32); 
+        const material2 = new THREE.MeshBasicMaterial({ map: loader.load('./images/moonmap.jpg') });
+        const sphere2 = new THREE.Mesh(geometry2, material2);
+        sphere2.position.set( -10, 0, 10 );  
+        scene.add(sphere2);
+        
+        // light from sun 
+        const sunlight = new THREE.PointLight( 0xffffff, 3 );
+        sunlight.position.set( 10, 20, -8 );
+        sunlight.intensity = 3;
+        scene.add( sunlight );
+
+        const light1 = new THREE.PointLight( 0xffffff, 3 );
+        light1.position.set( 0, 0, -10 );
+        light1.intensity = 1;
+        scene.add( light1 );
+
+        const light2 = new THREE.PointLight( 0xffffff, 3 );
+        light2.position.set( 0, 0, 10 );
+        light2.intensity = 1;
+        scene.add( light2 );
+
+        const light3 = new THREE.PointLight( 0xffffff, 3 );
+        light3.position.set( -10, 0, 0 );
+        light3.intensity = 1;
+        scene.add( light3 );
+
+        const light4 = new THREE.PointLight( 0xffffff, 3 );
+        light4.position.set( 10, 0, 0 );
+        light4.intensity = 1;
+        scene.add( light4 );
+
+        // defines rate of change for x and y positions 
+        let dx_sun = 0.025; 
+        let dy_sun = 0.05;
+        let dx_moon= -0.025; 
+        let dy_moon = -0.05;
+
+        const animate = function () {
+          requestAnimationFrame(animate);
+
+          controls.update();
+
+          animateSun(sunlight);
+          animateSun(sphere1); 
+          animateMoon(sphere2);
+          rotateObject(sphere1, 0.04, 0);
+          rotateObject(sphere2, 0.04, 0); 
+
+          renderer.render(scene, camera);
+        };
+
+        function animateSun(o) {
+          o.position.x += dx_sun;
+          o.position.y += dy_sun;
+
+          // defines upper x boundary for the sun 
+          if (o.position.x > 10) {
+            dx_sun = -0.025;
+          }
+          // defines lower x boundary for the sun 
+          else if (o.position.x < 0) {
+            dx_sun = 0.025;
+          }
+
+          // defines upper y boundary for the sun 
+          if (o.position.y > 20) {
+            dy_sun = -0.05;
+          }
+
+          // defines lower y boundary for the sun 
+          else if (o.position.y < 0) {
+            dy_sun = 0.05;
+          }
+
+          // sun changes color based on y position 
+          if (o.position.y > 5) {
+            sunlight.color.setHex( 0xffffff );
+            sunlight.intensity = 3;
+            light1.intensity = 1;
+            light2.intensity = 1;
+            light3.intensity = 1;
+            light4.intensity = 1;
+          }
+
+          else if (o.position.y < 5) {
+            sunlight.color.setHex( 0xebb134 );
+            sunlight.intensity = 1;
+            light1.intensity = 0.25;
+            light2.intensity = 0.25;
+            light3.intensity = 0.25;
+            light4.intensity = 0.25;
+          }
+        }
+
+        function animateMoon(o) {
+          o.position.x += dx_moon;
+          o.position.y += dy_moon;
+
+          // defines upper x boundary for the moon 
+          if (o.position.x > 0) {
+            dx_moon = -0.025;
+          }
+          // defines lower x boundary for the moon 
+          else if (o.position.x < -10) {
+            dx_moon = 0.025;
+          }
+
+          // defines upper y boundary for the moon 
+          if (o.position.y > 20) {
+            dy_moon = -0.05;
+          }
+
+          // defines lower y boundary for the moon
+          else if (o.position.y < 0) {
+            dy_moon = 0.05;
+          }
+        }
+
+        function rotateObject(o, dx, dy) {
+          o.rotation.x += dx;
+          o.rotation.y += dy;
+        }
+
+        animate();
+          
+
+        //the frameArea is from from https://threejsfundamentals.org/threejs/lessons/threejs-load-obj.html 
+        function frameArea(sizeToFitOnScreen, boxSize, boxCenter, camera) {
+          const halfSizeToFitOnScreen = sizeToFitOnScreen * 0.5;
+          const halfFovY = THREE.MathUtils.degToRad(camera.fov * .5);
+          const distance = halfSizeToFitOnScreen / Math.tan(halfFovY);
+          // compute a unit vector that points in the direction the camera is now
+          // in the xz plane from the center of the box
+          const direction = (new THREE.Vector3())
+            .subVectors(camera.position, boxCenter)
+            .multiply(new THREE.Vector3(1, 0, 1))
+            .normalize();
+
+          // move the camera to a position distance units way from the center
+          // in whatever direction the camera was from the center already
+          camera.position.copy(direction.multiplyScalar(distance).add(boxCenter));
+
+          // pick some near and far values for the frustum that
+          // will contain the box.
+          camera.near = boxSize / 100;
+          camera.far = boxSize * 100;
+
+          camera.updateProjectionMatrix();
+
+          // point the camera to look at the center of the box
+          camera.lookAt(boxCenter.x, boxCenter.y, boxCenter.z);
+        }
+        
+        new RGBELoader()
+					.setDataType( THREE.UnsignedByteType )
+					.setPath( 'gltf/DamagedHelmet/' )
+					.load( 'royal_esplanade_1k.hdr', function ( texture ) {
+
+          /*
+						const envMap = pmremGenerator.fromEquirectangular( texture ).texture;
+						scene.background = envMap;
+						scene.environment = envMap;
+						texture.dispose();
+						pmremGenerator.dispose();
+          */
+
+						render();
+
+						// model
+
+				//		const loader = new GLTFLoader().setPath( 'gltfs/DamagedHelmet/' );
+				//		loader.load( 'Helmet.txt', function ( gltf ) {
+
+//            const loader = new GLTFLoader().setPath( 'gltfs/antiqueCamera/' );
+//						loader.load( 'AntiqueCamera.gltf', function ( gltf ) {
+            const loader = new GLTFLoader().setPath( 'gltf/scene/' );
+						loader.load( 'untitled1.gltf', function ( gltf ) {
+              console.log(gltf)
+
+              scene.add( gltf.scene );
+
+              // compute the box that contains all the stuff
+              // from root and below
+              const box = new THREE.Box3().setFromObject( gltf.scene );
+
+              const boxSize = box.getSize(new THREE.Vector3()).length();
+              const boxCenter = box.getCenter(new THREE.Vector3());
+
+              
+
+              // set the camera to frame the box
+              frameArea(boxSize * 1.2, boxSize, boxCenter, camera);
+
+              // update the controls to handle the new size
+              controls.target.copy(boxCenter);
+              controls.update();
+
+						} );
+
+					} );
+
+				
+			}
+
+
+			function render() {        
+				renderer.render( scene, camera );
+			}
+      
+      
+      
+		</script>
+	</body>
+</html>
